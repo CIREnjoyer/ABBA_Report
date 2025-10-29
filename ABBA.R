@@ -60,6 +60,22 @@ dta2 <- dta2 |>
     Activism = case_when(
       EngagementType == "Activism" ~ 1,
       EngagementType != "Activism" ~ 0
+    ),
+    Workshop = case_when(
+      EngagementType == "Workshop" ~ 1,
+      EngagementType != "Workshop" ~ 0
+    ),
+    Sidecar = case_when(
+      type == "Sidecar" ~ 1,
+      type != "Sidecar" ~ 0
+    ),
+    Video = case_when(
+      type == "Video" ~ 1,
+      type  != "Video" ~ 0
+    ),
+    Image = case_when(
+      type == "Image" ~ 1,
+      type != "Image" ~ 0
     ))
 
 write.csv(dta2, "Dataset_Final.csv")
@@ -80,13 +96,18 @@ dta <- dta |>
          Activism = as.factor(Activism),
          Political = as.factor(Political),
          Social = as.factor(Social),
+         Workshop = as.factor(Workshop),
          EngagementType = as.factor(EngagementType),
-         type = as.factor(type))
+         type = as.factor(type),
+         Video = as.factor(Video),
+         Image = as.factor(Image),
+         Sidecar = as.factor(Sidecar))
 
 dta_use <- dta |>
   filter(Activism == 0 & Board3 == 0)
 
 summary(dta$likesCount)
+sd(dta$likesCount)
 
 likes <- ggplot(dta_use, aes(likesCount)) + #likes count 
   geom_histogram(
@@ -109,9 +130,10 @@ ggsave("comments.pdf", plot = comments)
 likes_out <- ggplot(dta, aes(likesCount)) + #likes count without outliers
   geom_histogram(
     fill = "lightgrey",
-    colour = "black"
+    colour = "black",
+    binwidth = 5
   ) +
-  xlim(0,250) +
+  coord_cartesian(xlim =c(0,250)) +
   labs(x = "Number of Likes", y = "Count")
 
 ggsave("likes_out.pdf", plot = likes_out)
@@ -146,7 +168,7 @@ engagement <- ggplot(dta, aes(x = EngagementType, fill = Board)) + #type of enga
          geom_bar(position = "dodge",
                   width = 0.4) +
   scale_fill_manual(values = c("darkblue", "darkred", "darkgreen")) + 
-  labs(x = "Engagement Type", y = "Count")
+  labs(x = "Theme", y = "Count")
 
 ggsave("engagement.pdf", plot = engagement)
 
@@ -156,7 +178,7 @@ englikes <- ggplot(dta, aes(x = EngagementType, y = likesCount)) + #likes by eng
     colour = "black",
     width = 0.4
   ) +
-  labs(x = "Engagement Type", y = "Number of Likes")
+  labs(x = "Theme", y = "Number of Likes")
 
 ggsave("englikes.pdf", plot = englikes)
 
@@ -166,7 +188,7 @@ engcomms <- ggplot(dta, aes(x = EngagementType, y = commentsCount)) + #comments 
     colour = "black",
     width = 0.4
   ) + 
-  labs(x = "Engagement Type", y = "Number of Comments")
+  labs(x = "Theme", y = "Number of Comments")
   
 ggsave("engcomms.pdf", plot = engcomms)
 
@@ -205,14 +227,14 @@ ggsave("boxout.pdf", plot = boxout)
 
 boxenglikes <- ggplot(dta_use, aes(x = EngagementType, y = likesCount)) + #boxplot likes by engagement
   geom_boxplot() + 
-  labs(x = "Engagement Type", y = "Number of Likes")
+  labs(x = "Theme", y = "Number of Likes")
 
 ggsave("boxenglikes.pdf", plot = boxenglikes)
 
 zoomboxenglikes <- ggplot(dta_use, aes(x = EngagementType, y = likesCount)) + #boxplot likes by engagement (zoomed)
   geom_boxplot() + 
   coord_cartesian(ylim = c(0,200)) + 
-  labs(x = "Engagement Type", y = "Number of Likes")
+  labs(x = "Theme", y = "Number of Likes")
 
 ggsave("zoomboxenglikes.pdf", plot = zoomboxenglikes)
 
@@ -246,9 +268,17 @@ model1_aug <- augment(model1)
 summary(model1_aug$.std.resid)
 summary(subset(model1_aug, likesCount != 1057)$.std.resid)
 
-model1.2 <- lm(likesCount ~ type + Board, data = subset(dta_use, likesCount != 1057))
+model1.2 <- lm(likesCount ~ Image + Board, data = subset(dta_use, likesCount != 1057))
 coeftest(model1.2, vcov = vcovHC(model1.2, type = "HC2"))
 summary(model1.2)
+
+model1.3 <- lm(likesCount ~ Video + Board, data = subset(dta_use, likesCount != 1057))
+coeftest(model1.3, vcov = vcovHC(model1.3, type = "HC2"))
+summary(model1.3)
+
+model1.4 <- lm(likesCount ~ Sidecar + Board, data = subset(dta_use, likesCount != 1057))
+coeftest(model1.4, vcov = vcovHC(model1.4, type = "HC2"))
+summary(model1.4)
 
 model2 <- lm(likesCount ~ Cultural + Board, data = subset(dta_use, likesCount != 1057))
 coeftest(model2, vcov = vcovHC(model2, type = "HC2"))
@@ -269,17 +299,22 @@ model5 <- lm(likesCount ~ Board + Cultural + Political + Social + type, data = s
 coeftest(model5, vcov = vcovHC(model5, type = "HC2"))
 summary(model5)
 
+model6 <- lm(likesCount ~ Workshop + Board, data = subset(dta_use, likesCount != 1057))
+coeftest(model6, vcov = vcovHC(model6, type = "HC2"))
+summary(model6)
+
 resid_panel(model5, plots = "cookd")
 check_heteroscedasticity(model5)
 
-
-
 robust_se1 <- sqrt(diag(vcovHC(model1, type = "HC2")))
 robust_se1.2 <- sqrt(diag(vcovHC(model1.2, type = "HC2")))
+robust_se1.3 <- sqrt(diag(vcovHC(model1.3, type = "HC2")))
+robust_se1.4 <- sqrt(diag(vcovHC(model1.4, type = "HC2")))
 robust_se2 <- sqrt(diag(vcovHC(model2, type = "HC2")))
 robust_se3 <- sqrt(diag(vcovHC(model3, type = "HC2")))
 robust_se4 <- sqrt(diag(vcovHC(model4, type = "HC2")))
 robust_se5 <- sqrt(diag(vcovHC(model5, type = "HC2")))
+robust_se6 <- sqrt(diag(vcovHC(model6, type = "HC2")))
 
 
 
@@ -289,17 +324,26 @@ stargazer(model1, model5,
           dep.var.labels = "Number of Likes",
           covariate.labels = c("Second Board", "Cultural", "Political", "Social", "Sidecar", "Video"),
           omit.stat = c("f", "ser"),
-          type = "latex",
+          type = "text"),
           out = "main model.tex")
 
-stargazer(model1.2, model2, model3, model4,
-          se = list(robust_se1.2, robust_se2, robust_se3, robust_se4),
-          title = "OLS Regression Engagement Type on Likes (Robust SE)",
+stargazer(model2, model3, model4, model6,
+          se = list(robust_se2 ,robust_se3, robust_se4, robust_se6),
+          title = "OLS Regression Isloated Effects (Robust SE)",
           dep.var.labels = "Number of Likes",
-          covariate.labels = c("Sidecar", "Video", "Cultural", "Political", "Social" ,"Second Board"),
+          covariate.labels = c("Cultural", "Political", "Social", "Workshop" ,"Second Board"),
           omit.stat = c("f", "ser"),
           type = "latex",
-          out = "types model.tex")
+          out = "themes.tex")
+
+stargazer(model1.2, model1.3, model1.4,
+          se = list(robust_se1.2, robust_se1.3, robust_se1.4),
+          title = "OLS Regression Isloated Effects (Robust SE)",
+          dep.var.labels = "Number of Likes",
+          covariate.labels = c("Image", "Video", "Sidecar", "Second Board"),
+          omit.stat = c("f", "ser"),
+          type = "latex",
+          out = "types.tex")
 
 stargazer(model5,
           se = list(robust_se5),

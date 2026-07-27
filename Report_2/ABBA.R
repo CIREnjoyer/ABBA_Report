@@ -12,6 +12,7 @@ library(sandwich)
 library(lmtest)
 library(stargazer)
 library(broom)
+library(emmeans)
 
 setwd("C:/Users/skots/Desktop/Нова папка/ABBA/Report 2")
 
@@ -98,15 +99,14 @@ ggplot(event, aes(board)) +
 
 ggplot(event, aes(board, attnum)) +
   geom_col(width = 0.5,
-           fill = "darkred",
-           colour = "black") +
+           fill = "darkred") +
   scale_y_continuous() +
   labs(x = "Board", y = "Sign-Ups") +
   theme_minimal(20)
 
 #ggsave("boardatt.pdf",
  #       width = 12,
-  #      height = 8)
+  #     height = 8)
 
 ggplot(event, aes(dprtm, fill = board)) +
   geom_bar(position = "dodge", colour = "black") +
@@ -120,15 +120,15 @@ ggplot(event, aes(dprtm, fill = board)) +
       # height = 8)
 
 ggplot(event, aes(dprtm, attnum, fill = board)) +
-  geom_col(position = "dodge", colour = "black") +
+  geom_col(position = "dodge") +
   scale_fill_manual(values = c("darkblue", "darkred", "darkgreen")) +
   scale_y_continuous() +
   labs(x = "Department", y = "Sign-Ups") +
   theme_minimal(20)
 
 #ggsave("depatt.pdf",
-      # width = 12,
-      # height = 8)
+ #      width = 12,
+  #     height = 8)
 
 ##### Models
 
@@ -152,19 +152,20 @@ resid_panel(model1, plots = "resid")
 
 
 
-model2 <- lm(attnum ~ dprtm*board + factor(inext) + factor(collab) + fee_f, data = event)
+model2 <- lm(attnum ~ dprtm + board + factor(inext) + factor(collab) + fee_f, data = event)
 summary(model2)
 
 check_heteroskedasticity(model2)
 resid_panel(model2, plots = "resid")
 resid_panel(model2, plots = "cookd")
+check_collinearity(model2)
 
 SE <- coeftest(model2, vcov = vcovHC(model2, type = "HC3"))[, "Std. Error"]
 
 stargazer(model2, type = "latex",
           se = list(SE),
           dep.var.labels = "Sign-Ups",
-          covariate.labels = c("Culture", "Other", "Social", "Ukraine", "Second Board", "Third Board", "Internal Event", "Collab - Yes", "Fee - Yes", "Second Board * Culture", "Second Board * Other", "Second Board * Social", "Second Board * Ukraine", "Third Board * Culture", "Third Board * Other", "Third Board * Social", "Third Board * Ukraine"),
+          covariate.labels = c("Culture", "Other", "Social", "Ukraine", "Second Board", "Third Board", "Internal Event", "Collab - Yes", "Fee - Yes"),
           star.cutoffs = c(0.05, 0.01, 0.001),
           notes = "OLS Regression with robust SE (HC3). The reference groups are: First Board, Academia, No collab, No fee")
 
@@ -192,17 +193,101 @@ check_heteroskedasticity(model_f)
 
 ##### Insta Data #####
 
-insta <- read.csv("https://raw.githubusercontent.com/CIREnjoyer/ABBA_Report/refs/heads/main/Report_2/insta.csv")
+insta1 <- read.csv("https://raw.githubusercontent.com/CIREnjoyer/ABBA_Report/refs/heads/main/Report_2/insta.csv")
 
-insta <- insta[, -c(1,2)]
-insta$date <- as.Date(insta$date)
+insta1 <- insta[, -1]
+insta1$date <- as.Date(insta1$date)
+insta <- filter(insta1, likesCount > 0)
 
 ##### Descriptives 
 
 ggplot(insta, aes(date, likesCount)) +
   geom_point() +
   geom_line() +
-  geom_smooth(method = "lm", se = F)
+  geom_smooth(method = "lm", se = F) +
+  coord_cartesian(ylim = c(0, 500)) +
+  scale_x_date(date_breaks = "6 months") +
+  theme_minimal(20) +
+  labs(x = "Date", y = "Likes")
+
+#ggsave("liketrend.pdf",
+ #    width = 12,
+  #    height = 8)
+
+ggplot(subset(insta, Activism == 0), aes(as.factor(Board))) +
+  geom_bar(fill = "darkred",
+           width = 0.5) +
+  theme_minimal(20) +
+  labs(x = "Board", y = "Count")
+
+#ggsave("boardcount.pdf",
+ #      width = 12,
+  #     height = 8)
+
+ggplot(subset(insta, Activism == 0), aes(as.factor(Board), likesCount)) +
+  geom_col(width = 0.5,
+           fill = "darkred") +
+  labs(x = "Board", y = "Likes") +
+  theme_minimal(20) +
+  scale_y_continuous(breaks = seq(0, 13000, by = 500))
+
+#ggsave("boardlikes.pdf",
+ #      width = 12,
+  #     height = 8)
+
+ggplot(subset(insta, Activism == 0), aes (as.factor(EngagementType), fill = as.factor(Board))) +
+  geom_bar(position = "dodge",
+           colour = "black") +
+  scale_fill_manual(values = c("darkred", "darkblue", "darkgreen")) +
+  labs(x = "Theme", y = "Count", fill = "Board") +
+  theme_minimal(20)
+
+#ggsave("themecount.pdf",
+ #      width = 12,
+  #     height = 8)
+
+ggplot(subset(insta, Activism == 0 & likesCount < 1000), aes(as.factor(EngagementType), likesCount, fill = as.factor(Board))) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("darkred", "darkblue", "darkgreen")) +
+  labs(x = "Theme", y = "Likes", fill = "Board") + 
+  theme_minimal(20)
+
+#ggsave("themelikes.pdf",
+ #      width = 12,
+  #     height = 8)
+
+ggplot(subset(insta, is.na(attnum) == F), aes(likesCount, attnum)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = F) + 
+  theme_minimal(20) + 
+  labs(x = "Likes", y = "Sign-Ups")
+
+#ggsave("attbylikes.pdf",
+ #      width = 12,
+  #     height = 8)
+
+##### Models
+
+insta$date_n <- as.numeric(insta$date) / 30.44 
+
+model <- lm(likesCount ~ date_n, data = subset(insta, Activism == 0))
+summary(model)
+
+
+model1 <- lm(likesCount ~ Board2 + Board3 + Political + Cultural + Workshop + Video + Carrousel, data = subset(insta, Activism == 0 & likesCount < 1000))
+summary(model1)
+
+resid_panel(model1, plots = "cookd")
+check_heteroskedasticity(model1)
+check_collinearity(model1)
+
+SE <- coeftest(model1, vcov = vcovHC(model1, type = "HC3"))[, "Std. Error"]
+
+stargazer(model1,
+          type = "text",
+          se = list(SE),
+          star.cutoffs = c(0.05, 0.01, 0.001))
+
 
 
 

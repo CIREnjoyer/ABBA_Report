@@ -12,7 +12,6 @@ library(sandwich)
 library(lmtest)
 library(stargazer)
 library(broom)
-library(emmeans)
 
 setwd("C:/Users/skots/Desktop/Нова папка/ABBA/Report 2")
 
@@ -50,8 +49,12 @@ ggplot(event, aes(date, attnum)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
   geom_smooth(method = "lm", se = F) +
-  theme_minimal() +
+  theme_minimal(20) +
   labs(x = "Date", y = "Sign-Ups")
+
+#ggsave("trend.pdf",
+ #      width = 12,
+  #     height = 8)
 
 ggplot(event, aes(attnum)) + 
   geom_histogram(binwidth = 15,
@@ -87,7 +90,23 @@ ggplot(event, aes(board)) +
            colour = "black") +
   scale_y_continuous(breaks = seq(0,50, by = 4)) +
   labs(x = "Board", y = "Count") +
-  theme_minimal()
+  theme_minimal(20)
+
+#ggsave("boardeve.pdf",
+ #      width = 12,
+  #     height = 8)
+
+ggplot(event, aes(board, attnum)) +
+  geom_col(width = 0.5,
+           fill = "darkred",
+           colour = "black") +
+  scale_y_continuous() +
+  labs(x = "Board", y = "Sign-Ups") +
+  theme_minimal(20)
+
+#ggsave("boardatt.pdf",
+ #       width = 12,
+  #      height = 8)
 
 ggplot(event, aes(dprtm, fill = board)) +
   geom_bar(position = "dodge", colour = "black") +
@@ -118,6 +137,12 @@ date_n <- as.numeric(event$date) / 30.44
 model_tr <- lm(attnum ~ date_n, data = event)
 summary(model_tr)
 
+stargazer(model_tr,
+          type = "latex",
+          dep.var.labels = "Sign-Ups",
+          covariate.labels = c("Date"),
+          star.cutoffs = c(0.05, 0.01, 0.001))
+
 
 
 model1 <- lm(attnum ~ board, data = event)
@@ -136,11 +161,12 @@ resid_panel(model2, plots = "cookd")
 
 SE <- coeftest(model2, vcov = vcovHC(model2, type = "HC3"))[, "Std. Error"]
 
-stargazer(model2, type = "text",
+stargazer(model2, type = "latex",
           se = list(SE),
           dep.var.labels = "Sign-Ups",
           covariate.labels = c("Culture", "Other", "Social", "Ukraine", "Second Board", "Third Board", "Internal Event", "Collab - Yes", "Fee - Yes", "Second Board * Culture", "Second Board * Other", "Second Board * Social", "Second Board * Ukraine", "Third Board * Culture", "Third Board * Other", "Third Board * Social", "Third Board * Ukraine"),
-          star.cutoffs = c(0.05, 0.01, 0.001))
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          notes = "OLS Regression with robust SE (HC3). The reference groups are: First Board, Academia, No collab, No fee")
 
 model3 <- lm(attnum ~ dprtm*board + factor(inext) + factor(collab) + fee_f, data = subset(event, attnum < 350))
 summary(model3)

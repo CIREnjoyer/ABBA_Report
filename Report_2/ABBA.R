@@ -190,4 +190,69 @@ summary(model_f)
 resid_panel(model_f, plots = "resid")
 check_heteroskedasticity(model_f)
 
+##### Insta Data #####
+
+dta1 <- read.csv("https://raw.githubusercontent.com/CIREnjoyer/ABBA_Report/refs/heads/main/Report_2/Insta_o.csv")
+dta <- read.csv("https://raw.githubusercontent.com/CIREnjoyer/ABBA_Report/refs/heads/main/Report_1/Dataset_Final.csv")
+
+dta1$date <- as.Date(substr(dta1$timestamp, 1, 10))
+dta$date <- as.Date(dta$date)
+
+insta <- bind_rows(dta, dta1)
+write_xlsx(insta, "insta_o.xlsx")
+
+insta <- read_excel("insta_o.xlsx")
+
+insta$Board <- ifelse(is.na(insta$Board) == T, 3, insta$Board)
+
+insta$Board1 <- ifelse(is.na(insta$Board) == T, 0, insta$Board)
+insta$Board2 <- ifelse(is.na(insta$Board) == T, 0, insta$Board)
+insta$Board3 <- ifelse(is.na(insta$Board) == T, 1, insta$Board)
+
+
+insta <- insta |>
+  mutate(Board1 = case_when(
+    Board == 1 ~ 1,
+    Board != 1 ~ 0 
+  ),
+  Board2 = case_when(
+    Board == 2 ~ 1,
+    Board != 2 ~ 0
+  ),
+  Board3 = case_when(
+    Board == 3 ~ 1,
+    Board != 3 ~ 0
+  ),
+  Social = case_when(
+    EngagementType == "Social" ~ 1,
+    EngagementType != "Social" ~ 0
+  ),
+  Cultural = case_when(
+    EngagementType == "Cultural" ~ 1,
+    EngagementType != "Cultural" ~ 0
+  ),
+  Political = case_when(
+    EngagementType == "Political" ~ 1,
+    EngagementType != "Political" ~ 0
+  ),
+  Activism = case_when(
+    EngagementType == "Activism" ~ 1,
+    EngagementType != "Activism" ~ 0
+  ),
+  Workshop = case_when(
+    EngagementType == "Workshop" ~ 1,
+    EngagementType != "Workshop" ~ 0
+  ),
+  Sidecar = case_when(
+    type == "Sidecar" ~ 1,
+    type != "Sidecar" ~ 0
+  ),
+  Video = case_when(
+    type == "Video" ~ 1,
+    type  != "Video" ~ 0
+  ),
+  Image = case_when(
+    type == "Image" ~ 1,
+    type != "Image" ~ 0
+  )) 
 

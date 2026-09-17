@@ -13,6 +13,8 @@ library(lmtest)
 library(stargazer)
 library(broom)
 library(emmeans)
+library(lattice)
+library(lme4)
 
 setwd("C:/Users/skots/Desktop/Нова папка/ABBA/Report 2")
 
@@ -49,13 +51,24 @@ event$fee <- ifelse(is.na(event$fee), 0, event$fee)
 ggplot(event, aes(date, attnum)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
-  geom_smooth(method = "lm", se = F) +
+  geom_smooth(aes(x = date, y = attnum),
+              method = "lm",
+              se = F) +
   theme_minimal(20) +
   labs(x = "Date", y = "Sign-Ups")
 
 #ggsave("trend.pdf",
- #      width = 12,
-  #     height = 8)
+#      width = 12,
+#     height = 8)
+
+xyplot(attnum ~ date | dprtm, data = event,
+       panel=function(x, y){
+         panel.dotplot(x,y)
+         panel.lmline(x, y, lty=1, lwd=2)
+       }, as.table=TRUE,
+       ylab = list(label = "Sign-Ups", cex = 2),
+       xlab = list(label = "Date", cex = 2),
+       scales = list(x = list(relation = "free", format = "%B %Y", cex = 1.2)))
 
 ggplot(event, aes(attnum)) + 
   geom_histogram(binwidth = 15,
@@ -119,10 +132,11 @@ ggplot(event, aes(dprtm, fill = board)) +
       # width = 12,
       # height = 8)
 
-ggplot(event, aes(dprtm, attnum, fill = board)) +
+event |>
+  summarise(attnum = sum(attnum), .by = c(dprtm, board)) |>
+  ggplot(aes(dprtm, attnum, fill = board)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("darkblue", "darkred", "darkgreen")) +
-  scale_y_continuous() +
   labs(x = "Department", y = "Sign-Ups") +
   theme_minimal(20)
 
@@ -143,14 +157,15 @@ stargazer(model_tr,
           covariate.labels = c("Date"),
           star.cutoffs = c(0.05, 0.01, 0.001))
 
-
-
 model1 <- lm(attnum ~ board, data = event)
 summary(model1)
 
+
 resid_panel(model1, plots = "resid")
 
-
+mlm <- lmer(attnum ~ date + (1 | dprtm), data = event)
+summary(mlm)
+icc(mlm)
 
 model2 <- lm(attnum ~ dprtm + board + factor(inext) + factor(collab) + fee_f, data = event)
 summary(model2)
@@ -194,14 +209,15 @@ check_heteroskedasticity(model_f)
 ##### Insta Data #####
 
 insta1 <- read.csv("https://raw.githubusercontent.com/CIREnjoyer/ABBA_Report/refs/heads/main/Report_2/insta.csv")
+#insta1 <- read_xlsx("insta_i.xlsx")
 
-insta1 <- insta[, -1]
+insta1 <- insta1[, -1]
 insta1$date <- as.Date(insta1$date)
 insta <- filter(insta1, likesCount > 0)
 
 ##### Descriptives 
 
-ggplot(insta, aes(date, likesCount)) +
+ggplot(subset(insta, Activism == 0), aes(date, likesCount)) +
   geom_point() +
   geom_line() +
   geom_smooth(method = "lm", se = F) +
@@ -246,17 +262,20 @@ ggplot(subset(insta, Activism == 0), aes (as.factor(EngagementType), fill = as.f
  #      width = 12,
   #     height = 8)
 
-ggplot(subset(insta, Activism == 0 & likesCount < 1000), aes(as.factor(EngagementType), likesCount, fill = as.factor(Board))) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("darkred", "darkblue", "darkgreen")) +
-  labs(x = "Theme", y = "Likes", fill = "Board") + 
-  theme_minimal(20)
+insta |>
+       filter(Activism == 0) |>
+       summarise(likes = sum(likesCount), .by = c(EngagementType, Board)) |>
+       ggplot(aes(EngagementType, likes, fill = factor(Board))) +
+       geom_col(position = "dodge") +
+       scale_fill_manual(values = c("darkred", "darkblue", "darkgreen")) +
+       labs(x = "Theme", y = "Likes", fill = "Board") +
+       theme_minimal(20)
 
 #ggsave("themelikes.pdf",
  #      width = 12,
   #     height = 8)
 
-ggplot(subset(insta, is.na(attnum) == F), aes(likesCount, attnum)) + 
+ggplot(subset(insta, is.na(attnum) == F & attnum < 250), aes(likesCount, attnum)) + 
   geom_point() +
   geom_smooth(method = "lm", se = F) + 
   theme_minimal(20) + 
@@ -273,6 +292,22 @@ insta$date_n <- as.numeric(insta$date) / 30.44
 model <- lm(likesCount ~ date_n, data = subset(insta, Activism == 0))
 summary(model)
 
+stargazer(model,
+          type = "latex",
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          dep.var.labels = "Likes",
+          covariate.labels = "Date")
+
+model0 <- lm(attnum ~ likesCount, data = subset(insta, is.na(attnum) == F & attnum < 250))
+summary(model0)
+
+stargazer(model0,
+          type = "latex",
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          dep.var.labels = "Sign-Ups",
+          covariate.labels = "Likes")
+
+resid_panel(model0, plots = "cookd")
 
 model1 <- lm(likesCount ~ Board2 + Board3 + Political + Cultural + Workshop + Video + Carrousel, data = subset(insta, Activism == 0 & likesCount < 1000))
 summary(model1)
@@ -284,9 +319,15 @@ check_collinearity(model1)
 SE <- coeftest(model1, vcov = vcovHC(model1, type = "HC3"))[, "Std. Error"]
 
 stargazer(model1,
-          type = "text",
+          type = "latex",
           se = list(SE),
+          dep.var.labels = "Likes",
+          covariate.labels = c("Second Board", "Third Board", "Political", "Cultural", "Workshop", "Video", "Carousel"),
+          notes = "OLS Regression with robust SE (HC3). The reference groups are: First Board, Social, and Image",
           star.cutoffs = c(0.05, 0.01, 0.001))
+
+m_log <- lm(log(attnum) ~ log(likesCount), data = subset(insta, Activism == 0))
+summary(m_log)
 
 
 
